@@ -250,20 +250,151 @@ class GameScene extends Phaser.Scene {
     this.livesTxt.setText(h[Math.max(0, 3 - this.lives)] || '· · ·');
   }
 
+  _getGrade() {
+    if (this.score >= 3000) return { grade: 'S', color: '#FFD700', msg: 'SEMPURNA!' };
+    if (this.score >= 1500) return { grade: 'A', color: '#FF6B6B', msg: 'LUAR BIASA!' };
+    if (this.score >= 800)  return { grade: 'B', color: '#5DCAA5', msg: 'BAGUS!' };
+    if (this.score >= 300)  return { grade: 'C', color: '#AFA9EC', msg: 'LUMAYAN~' };
+    if (this.score >= 100)  return { grade: 'D', color: '#F0997B', msg: 'PERLU LATIHAN' };
+    return                         { grade: 'E', color: '#888780', msg: 'MISI GAGAL' };
+  }
+
   _gameOver() {
     this.gameOverFlag = true;
     this.physics.pause();
     this.spawnTimer.remove();
-    this.add.rectangle(this.W/2, this.H/2, this.W, this.H, 0x000000, 0.72).setDepth(40);
-    this.add.text(this.W/2, this.H/2 - 80, '😵 GAME OVER!', { font: 'bold 34px monospace', color: '#FF4444' }).setOrigin(0.5).setDepth(41);
-    this.add.text(this.W/2, this.H/2 - 28, `Score: ${this.score}`, { font: '24px monospace', color: '#FFFF44' }).setOrigin(0.5).setDepth(41);
-    this.add.text(this.W/2, this.H/2 + 12, `Level: ${this.level}`, { font: '18px monospace', color: '#FF69B4' }).setOrigin(0.5).setDepth(41);
-    const btn = this.add.text(this.W/2, this.H/2 + 60, '[ MAIN LAGI ]', {
-      font: '22px monospace', color: '#9FE1CB', backgroundColor: '#0F3030', padding: { x: 16, y: 8 }
-    }).setOrigin(0.5).setDepth(41).setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => btn.setColor('#5DCAA5'));
-    btn.on('pointerout', () => btn.setColor('#9FE1CB'));
+
+    const cx = this.W / 2;
+    const { grade, color, msg } = this._getGrade();
+
+    // Dark overlay — animate in
+    const overlay = this.add.rectangle(cx, this.H/2, this.W, this.H, 0x000000, 0).setDepth(40);
+    this.tweens.add({ targets: overlay, alpha: 0.85, duration: 500 });
+
+    // Panel background
+    const panelH = 420;
+    const panel = this.add.rectangle(cx, this.H/2, this.W - 40, panelH, 0x111118, 0)
+      .setDepth(41).setStrokeStyle(1, 0x333344);
+    this.tweens.add({ targets: panel, alpha: 1, duration: 400, delay: 200 });
+
+    // Corner brackets (decorative)
+    const bx = cx - (this.W-40)/2, by = this.H/2 - panelH/2;
+    const bw = this.W - 40, bh = panelH;
+    const corners = [
+      this.add.text(bx + 4,      by + 4,      '┌', { font: '20px monospace', color: '#444466' }).setDepth(42),
+      this.add.text(bx+bw-18,    by + 4,      '┐', { font: '20px monospace', color: '#444466' }).setDepth(42),
+      this.add.text(bx + 4,      by+bh-24,    '└', { font: '20px monospace', color: '#444466' }).setDepth(42),
+      this.add.text(bx+bw-18,    by+bh-24,    '┘', { font: '20px monospace', color: '#444466' }).setDepth(42),
+    ];
+
+    // GAME OVER title — drops in
+    const goTxt = this.add.text(cx, by + 44, 'GAME OVER', {
+      font: 'bold 40px monospace', color: '#FFFFFF', letterSpacing: 6
+    }).setOrigin(0.5, 0).setDepth(42).setAlpha(0).setY(by + 20);
+    this.tweens.add({ targets: goTxt, y: by + 44, alpha: 1, duration: 400, delay: 300, ease: 'Back.Out' });
+
+    // Subtitle / msg
+    const subTxt = this.add.text(cx, by + 96, `— ${msg} —`, {
+      font: '13px monospace', color: color, letterSpacing: 3
+    }).setOrigin(0.5, 0).setDepth(42).setAlpha(0);
+    this.tweens.add({ targets: subTxt, alpha: 1, duration: 500, delay: 600 });
+
+    // Divider line
+    const line = this.add.rectangle(cx, by + 124, 0, 1, 0x333355).setDepth(42);
+    this.tweens.add({ targets: line, width: bw - 40, duration: 400, delay: 700 });
+
+    // "TOTAL SKOR" label
+    const lblTxt = this.add.text(cx, by + 138, 'TOTAL SKOR', {
+      font: '12px monospace', color: '#666688', letterSpacing: 4
+    }).setOrigin(0.5, 0).setDepth(42).setAlpha(0);
+    this.tweens.add({ targets: lblTxt, alpha: 1, duration: 300, delay: 900 });
+
+    // Score — count up animation
+    const scoreTxt = this.add.text(cx, by + 158, '000000', {
+      font: 'bold 48px monospace', color: '#FFD700'
+    }).setOrigin(0.5, 0).setDepth(42).setAlpha(0);
+    this.tweens.add({ targets: scoreTxt, alpha: 1, duration: 300, delay: 950 });
+    const finalScore = this.score;
+    let displayed = 0;
+    this.time.addEvent({
+      delay: 30, repeat: 40, startAt: 0,
+      callback: () => {
+        displayed = Math.min(displayed + Math.ceil(finalScore / 40), finalScore);
+        scoreTxt.setText(String(displayed).padStart(6, '0'));
+      }
+    });
+
+    // Second divider
+    const line2 = this.add.rectangle(cx, by + 222, 0, 1, 0x333355).setDepth(42);
+    this.tweens.add({ targets: line2, width: bw - 40, duration: 400, delay: 1200 });
+
+    // Level + Grade boxes
+    const boxY = by + 234;
+    const boxW = (bw - 60) / 2;
+
+    // Level box
+    this.add.rectangle(cx - boxW/2 - 5, boxY + 36, boxW, 72, 0x1a1a2e)
+      .setDepth(41).setStrokeStyle(1, 0x333355).setAlpha(0)
+      .setInteractive(false);
+    const levelBox = this.add.rectangle(cx - boxW/2 - 5, boxY + 36, boxW, 72, 0x1a1a2e)
+      .setDepth(42).setStrokeStyle(1, 0x333355).setAlpha(0);
+    this.tweens.add({ targets: levelBox, alpha: 1, duration: 300, delay: 1300 });
+    const lvlLbl = this.add.text(cx - boxW/2 - 5, boxY + 14, 'LEVEL', {
+      font: '11px monospace', color: '#666688', letterSpacing: 3
+    }).setOrigin(0.5, 0).setDepth(43).setAlpha(0);
+    const lvlVal = this.add.text(cx - boxW/2 - 5, boxY + 34, String(this.level), {
+      font: 'bold 28px monospace', color: '#FFFFFF'
+    }).setOrigin(0.5, 0).setDepth(43).setAlpha(0);
+    this.tweens.add({ targets: [lvlLbl, lvlVal], alpha: 1, duration: 300, delay: 1350 });
+
+    // Grade box
+    const gradeBox = this.add.rectangle(cx + boxW/2 + 5, boxY + 36, boxW, 72, 0x1a1a2e)
+      .setDepth(42).setStrokeStyle(1, 0x333355).setAlpha(0);
+    this.tweens.add({ targets: gradeBox, alpha: 1, duration: 300, delay: 1400 });
+    const gradeLbl = this.add.text(cx + boxW/2 + 5, boxY + 14, 'GRADE', {
+      font: '11px monospace', color: '#666688', letterSpacing: 3
+    }).setOrigin(0.5, 0).setDepth(43).setAlpha(0);
+    const gradeVal = this.add.text(cx + boxW/2 + 5, boxY + 30, grade, {
+      font: 'bold 32px monospace', color: color
+    }).setOrigin(0.5, 0).setDepth(43).setAlpha(0).setScale(0.4);
+    this.tweens.add({ targets: [gradeLbl], alpha: 1, duration: 300, delay: 1450 });
+    this.tweens.add({ targets: gradeVal, alpha: 1, scaleX: 1, scaleY: 1, duration: 400, delay: 1500, ease: 'Back.Out' });
+
+    // MAIN LAGI button
+    const btnY = by + panelH - 58;
+    const btn = this.add.text(cx, btnY, '  ▶  MAIN LAGI  ', {
+      font: 'bold 18px monospace', color: '#CCCCCC',
+      backgroundColor: '#222233',
+      padding: { x: 20, y: 12 }
+    }).setOrigin(0.5, 0).setDepth(43).setAlpha(0).setInteractive({ useHandCursor: true });
+
+    this.tweens.add({ targets: btn, alpha: 1, duration: 400, delay: 1800 });
+
+    // Pulse animation on button
+    this.time.delayedCall(2000, () => {
+      if (!btn.active) return;
+      this.tweens.add({ targets: btn, alpha: 0.6, duration: 600, yoyo: true, repeat: -1 });
+    });
+
+    btn.on('pointerover', () => { btn.setColor('#FFD700'); this.tweens.killTweensOf(btn); btn.setAlpha(1); });
+    btn.on('pointerout', () => { btn.setColor('#CCCCCC'); });
     btn.on('pointerdown', () => this.scene.restart());
+
+    // Grade S special effect — sparks
+    if (grade === 'S') {
+      this.time.delayedCall(1600, () => {
+        for (let i = 0; i < 20; i++) {
+          this.time.delayedCall(i * 80, () => {
+            const spark = this.add.text(
+              Phaser.Math.Between(bx+10, bx+bw-10),
+              Phaser.Math.Between(by+10, by+panelH-10),
+              '★', { font: '16px Arial', color: '#FFD700' }
+            ).setDepth(44).setAlpha(1);
+            this.tweens.add({ targets: spark, alpha: 0, y: spark.y - 30, duration: 600, onComplete: () => spark.destroy() });
+          });
+        }
+      });
+    }
   }
 
   update() {
